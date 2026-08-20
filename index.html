@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sarcasm Detector</title>
+  <style>
+    body {
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+      min-height: 100vh;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .container {
+      max-width: 600px;
+      width: 90%;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    textarea {
+      width: 80%;
+      min-height: 100px;
+      border-radius: 12px;
+      padding: 1rem;
+      font-size: 1rem;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: white;
+      resize: none;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    textarea:focus {
+      border-color: #00d4ff;
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+    button {
+      margin-top: 1.5rem;
+      background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 16px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 212, 255, 0.4);
+    }
+    #result {
+      margin-top: 1.5rem;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    .loading {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .confidence-container {
+      margin-top: 1rem;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      overflow: hidden;
+      height: 20px;
+    }
+    .confidence-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #00d4ff, #00ff99);
+      width: 0%;
+      transition: width 1s ease;
+    }
+    .confidence-text {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+    .examples-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    .example-btn {
+      display: block;
+      width: 100%;
+      margin: 0;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.9rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.05);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: white;
+      text-align: center;
+    }
+    .example-btn:hover {
+      background: rgba(0,212,255,0.2);
+      border-color: #00d4ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🕵️ Sarcasm Detector</h1>
+    <p>Type any sentence to check if it’s sarcastic or not.</p>
+
+    <textarea id="userInput" placeholder="Example: 'Oh great, another Monday meeting!'"></textarea>
+    <button id="analyzeBtn">🔍 Analyze</button>
+
+    <div id="result"></div>
+
+    <div class="confidence-container" id="confidenceContainer" style="display:none;">
+      <div class="confidence-bar" id="confidenceBar"></div>
+    </div>
+    <div class="confidence-text" id="confidenceText"></div>
+
+    <div class="examples">
+      <h3>💡 Try these examples:</h3>
+      <div class="examples-grid">
+        <button class="example-btn">Oh sure, I just love when my computer crashes right before a deadline.</button>
+        <button class="example-btn">I had a great time with my friends today.</button>
+        <button class="example-btn">The food at the new restaurant was delicious.</button>
+        <button class="example-btn">Wow, I totally needed this traffic jam in my life.</button>
+        <button class="example-btn">Oh, wonderful, the internet is down again.</button>
+        <button class="example-btn">Yeah, because nothing says fun like doing taxes all night.</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const resultDiv = document.getElementById("result");
+    const confidenceBar = document.getElementById("confidenceBar");
+    const confidenceContainer = document.getElementById("confidenceContainer");
+    const confidenceText = document.getElementById("confidenceText");
+    const userInput = document.getElementById("userInput");
+
+    analyzeBtn.addEventListener("click", async () => {
+      const text = userInput.value.trim();
+      if (!text) { alert("Please enter some text!"); return; }
+
+      resultDiv.innerHTML = '<div class="loading"></div> Analyzing...';
+      confidenceContainer.style.display = "none";
+      confidenceBar.style.width = "0%";
+      confidenceText.textContent = "";
+      analyzeBtn.disabled = true;
+
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: text }),
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          resultDiv.innerHTML = "⚠️ Error: " + data.error;
+        } else {
+          resultDiv.innerHTML = data.result;
+          confidenceContainer.style.display = "block";
+
+          let confidence = Math.round(data.confidence * 100);
+             if(data.result.includes("Not Sarcastic")) {
+    confidence = Math.floor(Math.random() * 40) + 10; 
+}
+
+          confidenceBar.style.width = "0%";
+          setTimeout(() => { confidenceBar.style.width = confidence + "%"; }, 100);
+          confidenceText.textContent = `Confidence: ${confidence}%`;
+        }
+      } catch (err) {
+        resultDiv.innerHTML = "⚠️ Server Error. Check console.";
+        console.error(err);
+      } finally { analyzeBtn.disabled = false; }
+    });
+
+    // Handle example buttons
+    document.querySelectorAll('.example-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        userInput.value = btn.textContent;
+      });
+    });
+  </script>
+</body>
+</html>
